@@ -1,0 +1,47 @@
+# Hostinger Deployment - Files to Upload
+# Copy this list to help track what needs to be uploaded
+
+# Root HTML Files
+index.html
+admin.html
+login.html
+register.html
+module1.html
+module2.html
+module3.html
+module4.html
+module5.html
+module6.html
+module7.html
+accessibility.html
+aml-policy.html
+complaints.html
+cookie-policy.html
+disclaimer.html
+modern-slavery.html
+privacy.html
+terms.html
+
+# Configuration Files
+.htaccess
+
+# Directories to Upload Entirely
+assets/
+js/
+
+# Files Inside assets/ folder
+assets/logo.svg
+assets/monty.jpg
+
+# Files Inside js/ folder (exclude __tests__ subfolder)
+js/footer.js
+js/layout.js
+js/main.js
+js/modules.js
+
+# Optional: If using pages/policies, upload only HTML files
+# pages/policies/cookie-policy.html
+# pages/policies/privacy-policy.html
+# pages/policies/terms-and-conditions.html
+# pages/policies/legal-disclaimer.html
+
