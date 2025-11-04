@@ -22,7 +22,7 @@ function initModule(moduleId, units) {
 }
 
 // Load unit content
-function loadUnit(unitId) {
+async function loadUnit(unitId) {
     if (!requireAuth()) return;
     
     currentUnit = unitId;
@@ -42,20 +42,22 @@ function loadUnit(unitId) {
         activeLink.classList.remove('text-gray-700');
     }
     
-    // Resolve video URL: unit-specific overrides module-level
-    let unitVideos, moduleVideos;
+    // Resolve video URL from backend (fallback to any local storage value)
+    let resolvedVideoUrl = '';
     try {
-        unitVideos = JSON.parse(localStorage.getItem('unitVideos')) || {};
-    } catch (e) {
-        unitVideos = {};
+        const res = await fetch(`api/unit_get.php?module=${encodeURIComponent(currentModule)}&unit=${encodeURIComponent(unitId)}`, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (res.ok && data && typeof data.video_url === 'string') {
+            resolvedVideoUrl = data.video_url || '';
+        }
+    } catch (_) {}
+    if (!resolvedVideoUrl) {
+        let unitVideos, moduleVideos;
+        try { unitVideos = JSON.parse(localStorage.getItem('unitVideos')) || {}; } catch (e) { unitVideos = {}; }
+        try { moduleVideos = JSON.parse(localStorage.getItem('moduleVideos')) || {}; } catch (e) { moduleVideos = {}; }
+        const unitKey = `${currentModule}.${unitId}`;
+        resolvedVideoUrl = unitVideos[unitKey] || moduleVideos[currentModule] || '';
     }
-    try {
-        moduleVideos = JSON.parse(localStorage.getItem('moduleVideos')) || {};
-    } catch (e) {
-        moduleVideos = {};
-    }
-    const unitKey = `${currentModule}.${unitId}`;
-    const resolvedVideoUrl = unitVideos[unitKey] || moduleVideos[currentModule] || '';
 
     // Helper: create embed HTML for YouTube/Vimeo/plain
     const embedHtml = (() => {
@@ -106,6 +108,16 @@ function loadUnit(unitId) {
         }
     })();
 
+    // Load unit content from backend (fallback to sample)
+    let unitContentHtml = '';
+    try {
+        const res = await fetch(`api/unit_get.php?module=${encodeURIComponent(currentModule)}&unit=${encodeURIComponent(unitId)}`, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (res.ok && data && typeof data.content === 'string' && data.content.trim()) {
+            unitContentHtml = data.content;
+        }
+    } catch (_) {}
+
     // Update content area
     const contentArea = document.getElementById('contentArea');
     contentArea.innerHTML = `
@@ -122,10 +134,8 @@ function loadUnit(unitId) {
         <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
             <div class="prose max-w-none">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4">Content</h2>
-                <p class="text-gray-600 mb-6">
-                    This is sample content for ${unitData.title}. Replace this with actual video embeds, text content, or other learning materials.
-                </p>
-                
+                ${unitContentHtml ? `<div class=\"prose max-w-none mb-6\">${unitContentHtml}</div>` : `<p class=\"text-gray-600 mb-6\">This is sample content for ${unitData.title}. Replace this with actual video embeds, text content, or other learning materials.</p>`}
+
                 ${embedHtml}
                 
                 <h3 class="text-xl font-semibold text-gray-800 mb-3">Key Points</h3>

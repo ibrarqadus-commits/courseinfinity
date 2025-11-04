@@ -6,9 +6,11 @@ $status = $_GET['status'] ?? 'all';
 $pdo = db();
 
 if ($status === 'pending') {
-    $stmt = $pdo->query("SELECT id, name, email, approved FROM users WHERE role <> 'admin' AND approved = 0 ORDER BY created_at DESC");
+    $stmt = $pdo->prepare("SELECT id, name, email, approved FROM users WHERE role <> 'admin' AND approved = 0 ORDER BY created_at DESC");
+    $stmt->execute();
 } else {
-    $stmt = $pdo->query("SELECT id, name, email, approved FROM users WHERE role <> 'admin' ORDER BY created_at DESC");
+    $stmt = $pdo->prepare("SELECT id, name, email, approved FROM users WHERE role <> 'admin' ORDER BY created_at DESC");
+    $stmt->execute();
 }
 
 $rows = $stmt->fetchAll();

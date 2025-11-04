@@ -837,7 +837,8 @@
             const url = prompt('Paste Unit Video URL');
             if (url === null) return; // cancelled
             try {
-                const [moduleId, unitId] = uid.split('.');
+                const parts = uid.split('.');
+                const moduleId = parts[0];
                 const form = new FormData();
                 form.append('module', moduleId);
                 form.append('unit', uid);
@@ -850,7 +851,8 @@
         async function quickClearVideo(uid) {
             if (!confirm('Remove video URL for this unit?')) return;
             try {
-                const [moduleId, unitId] = uid.split('.');
+                const parts = uid.split('.');
+                const moduleId = parts[0];
                 const form = new FormData();
                 form.append('module', moduleId);
                 form.append('unit', uid);

@@ -16,8 +16,35 @@ if ($module === '' || $unit === '') {
 }
 
 $pdo = db();
-$stmt = $pdo->prepare('INSERT INTO units (module_id, unit_id, content, video_url) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE content = COALESCE(VALUES(content), content), video_url = COALESCE(VALUES(video_url), video_url)');
-$stmt->execute([$module, $unit, $content, $video]);
+// Check if unit exists
+$stmt = $pdo->prepare('SELECT id FROM units WHERE module_id = ? AND unit_id = ?');
+$stmt->execute([$module, $unit]);
+$exists = $stmt->fetch();
+
+if ($exists) {
+    // Update existing record - only update non-null fields
+    $updates = [];
+    $params = [];
+    if ($content !== null) {
+        $updates[] = 'content = ?';
+        $params[] = $content;
+    }
+    if ($video !== null) {
+        $updates[] = 'video_url = ?';
+        $params[] = $video;
+    }
+    if (!empty($updates)) {
+        $params[] = $module;
+        $params[] = $unit;
+        $stmt = $pdo->prepare('UPDATE units SET ' . implode(', ', $updates) . ' WHERE module_id = ? AND unit_id = ?');
+        $stmt->execute($params);
+    }
+} else {
+    // Insert new record
+    $stmt = $pdo->prepare('INSERT INTO units (module_id, unit_id, content, video_url) VALUES (?, ?, ?, ?)');
+    $stmt->execute([$module, $unit, $content, $video]);
+}
+
 json_response(['ok' => true]);
 
 
