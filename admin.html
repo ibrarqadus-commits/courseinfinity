@@ -91,7 +91,17 @@
 
             <!-- Pending Approvals -->
             <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
-                <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Pending Approvals</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800">Pending Approvals</h2>
+                    <button onclick="refreshPendingList()" class="bg-[#244855] text-white px-4 py-2 rounded-lg hover:bg-[#1a3540] transition text-sm">
+                        Refresh
+                    </button>
+                </div>
+                <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-xs text-yellow-800">
+                        <strong>Note:</strong> This system uses browser localStorage. Student registrations are only visible if you're using the same browser where they registered. For production, consider using a backend database.
+                    </p>
+                </div>
                 <div id="pendingList" class="space-y-3">
                     <p class="text-gray-500 text-sm sm:text-base">No pending approvals</p>
                 </div>
@@ -417,8 +427,10 @@
         function updateStats() {
             const users = JSON.parse(localStorage.getItem('users')) || [];
             const students = users.filter(u => u.role !== 'admin');
-            const approved = students.filter(s => s.approved);
-            const pending = students.filter(s => !s.approved);
+            // Handle both explicit true and truthy values
+            const approved = students.filter(s => s.approved === true);
+            // Handle false, undefined, and null as pending
+            const pending = students.filter(s => s.approved === false || s.approved === undefined || s.approved === null);
 
             document.getElementById('totalStudents').textContent = students.length;
             document.getElementById('approvedStudents').textContent = approved.length;
@@ -427,8 +439,17 @@
 
         function updatePendingList() {
             const users = JSON.parse(localStorage.getItem('users')) || [];
-            const pending = users.filter(u => u.role !== 'admin' && !u.approved);
+            // Filter for students (non-admin) who are not approved
+            // Handle both explicit false and undefined/null values
+            const pending = users.filter(u => {
+                return u.role !== 'admin' && (u.approved === false || u.approved === undefined || u.approved === null);
+            });
             const container = document.getElementById('pendingList');
+
+            // Debug logging
+            console.log('Total users:', users.length);
+            console.log('Pending students:', pending.length);
+            console.log('All users:', users);
 
             if (pending.length === 0) {
                 container.innerHTML = '<p class="text-gray-500">No pending approvals</p>';
@@ -451,6 +472,13 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function refreshPendingList() {
+            updateStats();
+            updatePendingList();
+            updateStudentsTable();
+            alert('Student list refreshed!');
         }
 
         function updateStudentsTable() {
