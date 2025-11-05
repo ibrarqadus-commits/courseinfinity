@@ -18,6 +18,16 @@ function initModule(moduleId, units) {
     moduleData[moduleId].units = units;
     updateProgress();
     
+    // Check for unit parameter in URL and load it if specified
+    const urlParams = new URLSearchParams(window.location.search);
+    const unitParam = urlParams.get('unit');
+    if (unitParam) {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            loadUnit(unitParam);
+        }, 100);
+    }
+    
     // Sidebar toggle for mobile - handled in page scripts
 }
 
@@ -51,8 +61,44 @@ async function loadUnit(unitId) {
         resolvedVideoUrl = '';
     }
 
-    // Helper: create embed HTML for YouTube/Vimeo/plain
-    const embedHtml = (() => {
+    // We'll compute embedHtml AFTER reading JSON overrides for videoUrl
+    let embedHtml = '';
+
+    // Load unit content from localStorage (static site - no backend)
+    let unitContentHtml = '';
+    try {
+        const unitContent = JSON.parse(localStorage.getItem('unitContent')) || {};
+        const unitKey = `${currentModule}.${unitId}`;
+        unitContentHtml = unitContent[unitKey] || '';
+    } catch (e) {
+        unitContentHtml = '';
+    }
+
+    // Load key points/content from JSON if available (e.g., json/units/1/1.1.json)
+    let keyPoints = [
+        'Key learning point 1',
+        'Key learning point 2',
+        'Key learning point 3'
+    ];
+    try {
+        const jsonPath = `json/units/${currentModule}/${unitId}.json`;
+        const res = await fetch(jsonPath, { cache: 'no-cache' });
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.keyPoints) && data.keyPoints.length > 0) {
+                keyPoints = data.keyPoints;
+            }
+            if (typeof data.content === 'string' && data.content.trim()) {
+                unitContentHtml = data.content;
+            }
+            if (typeof data.videoUrl === 'string' && data.videoUrl.trim()) {
+                resolvedVideoUrl = data.videoUrl.trim();
+            }
+        }
+    } catch (_) {}
+
+    // Now that resolvedVideoUrl may have been overridden by JSON, build embedHtml
+    embedHtml = (() => {
         const wrapperStart = '<div class="w-full flex justify-center mb-4 sm:mb-6"><div class="w-full md:w-4/5 border-8 sm:border-[16px] lg:border-[64px] border-[#eaeaea] rounded-lg sm:rounded-2xl shadow-xl overflow-hidden" style="box-sizing: content-box;">';
         const wrapperEnd = '</div></div>';
         if (!resolvedVideoUrl) return (
@@ -100,55 +146,65 @@ async function loadUnit(unitId) {
         }
     })();
 
-    // Load unit content from localStorage (static site - no backend)
-    let unitContentHtml = '';
-    try {
-        const unitContent = JSON.parse(localStorage.getItem('unitContent')) || {};
-        const unitKey = `${currentModule}.${unitId}`;
-        unitContentHtml = unitContent[unitKey] || '';
-    } catch (e) {
-        unitContentHtml = '';
-    }
-
-    // Load key points/content from JSON if available (e.g., json/units/1/1.1.json)
-    let keyPoints = [
-        'Key learning point 1',
-        'Key learning point 2',
-        'Key learning point 3'
-    ];
-    try {
-        const jsonPath = `json/units/${currentModule}/${unitId}.json`;
-        const res = await fetch(jsonPath, { cache: 'no-cache' });
-        if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data.keyPoints) && data.keyPoints.length > 0) {
-                keyPoints = data.keyPoints;
-            }
-            if (typeof data.content === 'string' && data.content.trim()) {
-                unitContentHtml = data.content;
-            }
-        }
-    } catch (_) {}
-
-    // Build Resources section: show and link the JSON file as text when available
+    // Build Resources section: prefer a unit markdown/text file (json/unit {unitId}.md|.txt),
+    // then fall back to per-unit JSON text
     let resourcesHtml = '';
     try {
         let rendered = false;
-        // Prefer explicit markdown file for Unit 1.1
-        if (currentModule === '1' && unitId === '1.1') {
-            const mdPath = 'json/unit 1.1.md';
-            const mdRes = await fetch(mdPath, { cache: 'no-cache' });
-            if (mdRes.ok) {
-                const mdText = await mdRes.text();
-                const safeMd = mdText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // 1) Try unit-level text file
+        try {
+            const txtPath = `json/unit ${unitId}.txt`;
+            const txtRes = await fetch(txtPath, { cache: 'no-cache' });
+            if (txtRes.ok) {
+                const txt = await txtRes.text();
+                const safeTxt = txt.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 resourcesHtml = `
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Resources (Markdown)</h3>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Unit ${unitId}</h3>
                     <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6">
-                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 overflow-auto">${safeMd}</pre>
+                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 max-h-[420px] overflow-y-auto">${safeTxt}</pre>
                     </div>
                 `;
                 rendered = true;
             }
+        } catch (_) {}
+        // 2) Try unit-level markdown
+        if (!rendered) {
+            try {
+                const mdPath = `json/unit ${unitId}.md`;
+                const mdRes = await fetch(mdPath, { cache: 'no-cache' });
+                if (mdRes.ok) {
+                    const mdText = await mdRes.text();
+                    const safeMd = mdText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    resourcesHtml = `
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">Unit ${unitId}</h3>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6">
+                            <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 max-h-[420px] overflow-y-auto">${safeMd}</pre>
+                        </div>
+                    `;
+                    rendered = true;
+                } else if (mdRes.status === 404) {
+                    console.warn(`MD file not found: ${mdPath}`);
+                }
+            } catch (e) {
+                console.error(`Error loading MD file for unit ${unitId}:`, e);
+            }
+        }
+        // 3) Optional: unit-level PDF (hidden toolbar)
+        if (!rendered) {
+            const pdfPath = `json/unit ${unitId}.pdf`;
+            try {
+                const pdfHead = await fetch(pdfPath, { cache: 'no-cache', method: 'HEAD' });
+                if (pdfHead.ok) {
+                    const pdfNoUi = `${pdfPath}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&view=FitH`;
+                    resourcesHtml = `
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">Unit ${unitId}</h3>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6" oncontextmenu="return false;">
+                            <iframe src="${pdfNoUi}" class="w-full h-[600px] border border-gray-300 rounded" sandbox="allow-scripts allow-same-origin"></iframe>
+                        </div>
+                    `;
+                    rendered = true;
+                }
+            } catch (_) {}
         }
         if (!rendered) {
             const jsonPath = `json/units/${currentModule}/${unitId}.json`;
@@ -157,9 +213,9 @@ async function loadUnit(unitId) {
                 const rawText = await resText.text();
                 const safeText = rawText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 resourcesHtml = `
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Resources (JSON)</h3>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Unit ${unitId}</h3>
                     <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6">
-                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 overflow-auto">${safeText}</pre>
+                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 max-h-[420px] overflow-y-auto">${safeText}</pre>
                     </div>
                 `;
             } else {
@@ -184,21 +240,59 @@ async function loadUnit(unitId) {
         </div>
         
         <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
-            <div class="prose max-w-none">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">Content</h2>
-                ${unitContentHtml ? `<div class=\"prose max-w-none mb-6\">${unitContentHtml}</div>` : `<p class=\"text-gray-600 mb-6\">This is sample content for ${unitData.title}. Replace this with actual video embeds, text content, or other learning materials.</p>`}
+            <div class="prose prose-lg max-w-none leading-relaxed text-gray-800">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Welcome to ${unitId}</h2>
+                ${unitContentHtml ? `<div class=\"prose max-w-none mb-6\">${unitContentHtml}</div>` : ``}
 
                 ${embedHtml}
-                
-                <h3 class="text-xl font-semibold text-gray-800 mb-3">Key Points</h3>
-                <ul class="list-disc list-inside space-y-2 text-gray-600 mb-6">
-                    ${keyPoints.map(p => `<li>${p}</li>`).join('')}
-                </ul>
                 
                 ${resourcesHtml}
             </div>
         </div>
         
+        ${(() => {
+            // Read-only section (no user edits). Preferred files for Unit 1.1:
+            // - json/unit 1.1 section.txt
+            // - json/unit 1.1 section.md
+            // Generic fallbacks per unit:
+            // - json/units/${currentModule}/${unitId}-section.txt
+            // - json/units/${currentModule}/${unitId}-section.md
+            try {
+                const sectionId = 'readOnlySection';
+                setTimeout(async () => {
+                    const container = document.getElementById(sectionId);
+                    if (!container) return;
+                    const tryPaths = [];
+                    if (currentModule === '1' && currentUnit === '1.1') {
+                        tryPaths.push('json/unit 1.1 section.txt');
+                        tryPaths.push('json/unit 1.1 section.md');
+                    }
+                    tryPaths.push(`json/units/${currentModule}/${unitId}-section.txt`);
+                    tryPaths.push(`json/units/${currentModule}/${unitId}-section.md`);
+                    for (const p of tryPaths) {
+                        try {
+                            const res = await fetch(p, { cache: 'no-cache' });
+                            if (res.ok) {
+                                const t = await res.text();
+                                const safe = t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                container.innerHTML = `
+                                    <h3 class=\"text-xl font-semibold text-gray-800 mb-3\">Section</h3>
+                                    <pre class=\"whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 max-h-[420px] overflow-y-auto\">${safe}</pre>
+                                `;
+                                return;
+                            }
+                        } catch (_) {}
+                    }
+                    container.style.display = 'none';
+                }, 0);
+                return `
+                    <div id=\"${sectionId}\" class=\"bg-white rounded-lg shadow-md p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6\"></div>
+                `;
+            } catch (_) {
+                return '';
+            }
+        })()}
+
         <div class="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
             <button onclick="loadPrevious()" class="w-full sm:w-auto bg-gray-200 text-gray-700 px-4 sm:px-6 py-2 rounded-lg hover:bg-gray-300 transition text-sm sm:text-base">
                 ← Previous
@@ -209,6 +303,8 @@ async function loadUnit(unitId) {
         </div>
     `;
     
+    // Read-only section: no user input to save
+
     // Close mobile sidebar if on mobile
     if (window.innerWidth < 1024) {
         if (typeof window.closeMobileSidebar === 'function') {
