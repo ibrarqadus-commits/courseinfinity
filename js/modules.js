@@ -23,8 +23,6 @@ function initModule(moduleId, units) {
 
 // Load unit content
 async function loadUnit(unitId) {
-    if (!requireAuth()) return;
-    
     currentUnit = unitId;
     const unitData = moduleData[currentModule].units.find(u => u.id === unitId);
     
@@ -42,21 +40,15 @@ async function loadUnit(unitId) {
         activeLink.classList.remove('text-gray-700');
     }
     
-    // Resolve video URL from backend (fallback to any local storage value)
+    // Resolve video URL from localStorage (static site - no backend)
     let resolvedVideoUrl = '';
     try {
-        const res = await fetch(`api/unit_get.php?module=${encodeURIComponent(currentModule)}&unit=${encodeURIComponent(unitId)}`, { credentials: 'same-origin' });
-        const data = await res.json();
-        if (res.ok && data && typeof data.video_url === 'string') {
-            resolvedVideoUrl = data.video_url || '';
-        }
-    } catch (_) {}
-    if (!resolvedVideoUrl) {
-        let unitVideos, moduleVideos;
-        try { unitVideos = JSON.parse(localStorage.getItem('unitVideos')) || {}; } catch (e) { unitVideos = {}; }
-        try { moduleVideos = JSON.parse(localStorage.getItem('moduleVideos')) || {}; } catch (e) { moduleVideos = {}; }
+        let unitVideos = JSON.parse(localStorage.getItem('unitVideos')) || {};
+        let moduleVideos = JSON.parse(localStorage.getItem('moduleVideos')) || {};
         const unitKey = `${currentModule}.${unitId}`;
         resolvedVideoUrl = unitVideos[unitKey] || moduleVideos[currentModule] || '';
+    } catch (e) {
+        resolvedVideoUrl = '';
     }
 
     // Helper: create embed HTML for YouTube/Vimeo/plain
@@ -108,15 +100,75 @@ async function loadUnit(unitId) {
         }
     })();
 
-    // Load unit content from backend (fallback to sample)
+    // Load unit content from localStorage (static site - no backend)
     let unitContentHtml = '';
     try {
-        const res = await fetch(`api/unit_get.php?module=${encodeURIComponent(currentModule)}&unit=${encodeURIComponent(unitId)}`, { credentials: 'same-origin' });
-        const data = await res.json();
-        if (res.ok && data && typeof data.content === 'string' && data.content.trim()) {
-            unitContentHtml = data.content;
+        const unitContent = JSON.parse(localStorage.getItem('unitContent')) || {};
+        const unitKey = `${currentModule}.${unitId}`;
+        unitContentHtml = unitContent[unitKey] || '';
+    } catch (e) {
+        unitContentHtml = '';
+    }
+
+    // Load key points/content from JSON if available (e.g., json/units/1/1.1.json)
+    let keyPoints = [
+        'Key learning point 1',
+        'Key learning point 2',
+        'Key learning point 3'
+    ];
+    try {
+        const jsonPath = `json/units/${currentModule}/${unitId}.json`;
+        const res = await fetch(jsonPath, { cache: 'no-cache' });
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.keyPoints) && data.keyPoints.length > 0) {
+                keyPoints = data.keyPoints;
+            }
+            if (typeof data.content === 'string' && data.content.trim()) {
+                unitContentHtml = data.content;
+            }
         }
     } catch (_) {}
+
+    // Build Resources section: show and link the JSON file as text when available
+    let resourcesHtml = '';
+    try {
+        let rendered = false;
+        // Prefer explicit markdown file for Unit 1.1
+        if (currentModule === '1' && unitId === '1.1') {
+            const mdPath = 'json/unit 1.1.md';
+            const mdRes = await fetch(mdPath, { cache: 'no-cache' });
+            if (mdRes.ok) {
+                const mdText = await mdRes.text();
+                const safeMd = mdText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                resourcesHtml = `
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Resources (Markdown)</h3>
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6">
+                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 overflow-auto">${safeMd}</pre>
+                    </div>
+                `;
+                rendered = true;
+            }
+        }
+        if (!rendered) {
+            const jsonPath = `json/units/${currentModule}/${unitId}.json`;
+            const resText = await fetch(jsonPath, { cache: 'no-cache' });
+            if (resText.ok) {
+                const rawText = await resText.text();
+                const safeText = rawText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                resourcesHtml = `
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Resources (JSON)</h3>
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-6">
+                        <pre class="whitespace-pre-wrap text-sm text-black bg-white border border-gray-200 rounded p-3 overflow-auto">${safeText}</pre>
+                    </div>
+                `;
+            } else {
+                resourcesHtml = '';
+            }
+        }
+    } catch (_) {
+        resourcesHtml = '';
+    }
 
     // Update content area
     const contentArea = document.getElementById('contentArea');
@@ -140,18 +192,10 @@ async function loadUnit(unitId) {
                 
                 <h3 class="text-xl font-semibold text-gray-800 mb-3">Key Points</h3>
                 <ul class="list-disc list-inside space-y-2 text-gray-600 mb-6">
-                    <li>Key learning point 1</li>
-                    <li>Key learning point 2</li>
-                    <li>Key learning point 3</li>
+                    ${keyPoints.map(p => `<li>${p}</li>`).join('')}
                 </ul>
                 
-                <h3 class="text-xl font-semibold text-gray-800 mb-3">Resources</h3>
-                <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <p class="text-gray-600">Download additional resources and templates for this unit.</p>
-                    <button class="mt-3 bg-[#244855] text-white px-4 py-2 rounded hover:bg-[#1a3540] transition">
-                        Download Resources
-                    </button>
-                </div>
+                ${resourcesHtml}
             </div>
         </div>
         
@@ -239,33 +283,23 @@ function updateProgress() {
     }
     
     // Update unit indicators
-    if (checkAuth() && currentModule) {
-        const userStr = localStorage.getItem('currentUser');
-        let currentUser = null;
-        if (userStr) {
-            try {
-                currentUser = JSON.parse(userStr);
-            } catch (e) {
-                // Invalid JSON, skip
-            }
-        }
-        const moduleProgress = (currentUser && currentUser.progress && currentUser.progress[currentModule]) || {};
+    const progressData = JSON.parse(localStorage.getItem('progress')) || {};
+    const moduleProgress = progressData[currentModule] || {};
+    
+    document.querySelectorAll('.unit-link, .unit-link-mobile').forEach(link => {
+        const unitId = link.getAttribute('data-unit');
+        const icon = link.querySelector('span');
         
-        document.querySelectorAll('.unit-link, .unit-link-mobile').forEach(link => {
-            const unitId = link.getAttribute('data-unit');
-            const icon = link.querySelector('span');
-            
-            if (moduleProgress[unitId] && icon) {
-                icon.textContent = '✓';
-                icon.classList.remove('text-gray-400');
-                icon.classList.add('text-green-600');
-            } else if (icon && !moduleProgress[unitId]) {
-                icon.textContent = '○';
-                icon.classList.remove('text-green-600');
-                icon.classList.add('text-gray-400');
-            }
-        });
-    }
+        if (moduleProgress[unitId] && icon) {
+            icon.textContent = '✓';
+            icon.classList.remove('text-gray-400');
+            icon.classList.add('text-green-600');
+        } else if (icon && !moduleProgress[unitId]) {
+            icon.textContent = '○';
+            icon.classList.remove('text-green-600');
+            icon.classList.add('text-gray-400');
+        }
+    });
 }
 
 // Load next unit
