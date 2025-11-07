@@ -21,7 +21,7 @@
             '      <h2 class="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-light mb-3 sm:mb-4 leading-snug px-2">Guerrilla Business Mastermind</h2>' +
             '      <p class="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl mb-4 sm:mb-6 max-w-3xl mx-auto leading-relaxed px-4">Master the art of property management and build your path to financial freedom through proven lettings and management strategies.</p>' +
             '      <div class="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 px-4">' +
-            '        <a href="index.html#modules" class="bg-white text-[#244855] px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold hover:bg-gray-100 transition text-center text-sm sm:text-base">Get Started</a>' +
+            '        <a href="register.html" class="bg-white text-[#244855] px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold hover:bg-gray-100 transition text-center text-sm sm:text-base">Get Started</a>' +
             '        <a href="index.html#modules" class="bg-transparent border-2 border-white text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold hover:bg-white hover:text-[#244855] transition text-center text-sm sm:text-base">Learn More</a>' +
             '      </div>' +
             '    </div>' +
@@ -70,13 +70,30 @@
             '          </div>' +
             '        </div>' +
             '      </div>' +
-            '      <div class="flex items-center space-x-4">' +
+            '      <div class="flex items-center space-x-4" id="authButtons">' +
+            '        <!-- These will be dynamically shown/hidden based on login status -->' +
+            '        <div id="loggedOutButtons" class="flex items-center space-x-2 sm:space-x-4">' +
+            '          <a href="register.html" class="hidden sm:block bg-[#244855] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#1a3540] transition text-sm">Register</a>' +
+            '          <a href="login.html" class="hidden sm:block bg-transparent border-2 border-[#244855] text-[#244855] px-4 py-2 rounded-lg font-semibold hover:bg-[#244855] hover:text-white transition text-sm">Student Login</a>' +
+            '        </div>' +
+            '        <div id="loggedInButtons" class="hidden flex items-center space-x-2 sm:space-x-4">' +
+            '          <span class="hidden sm:block text-sm text-gray-700 font-medium" id="studentNameDisplay"></span>' +
+            '          <button onclick="handleStudentLogout()" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition text-sm">Logout</button>' +
+            '        </div>' +
             '      </div>' +
             '    </div>' +
             '    <!-- Mobile menu -->' +
             '    <div id="mobileMenu" class="hidden lg:hidden border-t border-gray-200 py-2">' +
             '      <div class="flex flex-col space-y-1">' +
             '        <a href="index.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform" data-page="index.html">Home</a>' +
+            '        <div id="mobileLoggedOutButtons">' +
+            '          <a href="register.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform bg-[#244855] text-white">Register</a>' +
+            '          <a href="login.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform border-2 border-[#244855] text-[#244855]">Student Login</a>' +
+            '        </div>' +
+            '        <div id="mobileLoggedInButtons" class="hidden">' +
+            '          <div class="px-4 py-2 text-sm text-gray-700 font-medium" id="mobileStudentNameDisplay"></div>' +
+            '          <button onclick="handleStudentLogout()" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform bg-red-600 text-white">Logout</button>' +
+            '        </div>' +
             '        <a href="module1.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform" data-page="module1.html">Module 1</a>' +
             '        <a href="module2.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform" data-page="module2.html">Module 2</a>' +
             '        <a href="module3.html" class="nav-link-mobile px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out transform" data-page="module3.html">Module 3</a>' +
@@ -175,6 +192,21 @@
                     transform: translateY(0) !important;
                     pointer-events: auto !important;
                     display: block !important;
+                }
+                /* Disable dropdown for modules without access */
+                .nav-link-container.no-access:hover .module-units-dropdown {
+                    opacity: 0 !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                    display: none !important;
+                }
+                .nav-link-container.no-access .nav-link {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    pointer-events: auto;
+                }
+                .nav-link-container.no-access .nav-link:hover {
+                    opacity: 0.6;
                 }
                 .nav-link-container:hover .module-units-dropdown a {
                     pointer-events: auto;
@@ -517,6 +549,162 @@
             }
             // Also run after a short delay to catch any dynamically loaded content
             setTimeout(populate, 100);
+        })();
+
+        // Disable dropdowns for modules without access
+        (function disableUnauthorizedModuleDropdowns() {
+            function disableDropdowns() {
+                try {
+                    // Check if student is logged in
+                    if (typeof getCurrentStudent !== 'function') {
+                        return; // main.js not loaded yet
+                    }
+                    
+                    const currentStudent = getCurrentStudent();
+                    if (!currentStudent) {
+                        // Not logged in - all modules accessible (they'll see access denied on click)
+                        return;
+                    }
+
+                    // Get student's access modules
+                    const accessModules = currentStudent.accessModules || [];
+                    
+                    // Find all module link containers
+                    const navContainers = document.querySelectorAll('.nav-link-container');
+                    
+                    // Disable nav dropdowns for modules without access
+                    navContainers.forEach(container => {
+                        const moduleLink = container.querySelector('.nav-link[data-module]');
+                        if (moduleLink) {
+                            const moduleId = moduleLink.getAttribute('data-module');
+                            if (!accessModules.includes(parseInt(moduleId))) {
+                                container.classList.add('no-access');
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error disabling unauthorized module dropdowns:', e);
+                }
+            }
+            
+            // Run after a delay to ensure main.js is loaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(disableDropdowns, 200);
+                });
+            } else {
+                setTimeout(disableDropdowns, 200);
+            }
+        })();
+
+        // Update navigation based on student login status
+        (function updateAuthNavigation() {
+            function updateNav() {
+                try {
+                    if (typeof getCurrentStudent !== 'function') {
+                        return; // main.js not loaded yet
+                    }
+                    
+                    const currentStudent = getCurrentStudent();
+                    const loggedOutButtons = document.getElementById('loggedOutButtons');
+                    const loggedInButtons = document.getElementById('loggedInButtons');
+                    const studentNameDisplay = document.getElementById('studentNameDisplay');
+                    const mobileLoggedOutButtons = document.getElementById('mobileLoggedOutButtons');
+                    const mobileLoggedInButtons = document.getElementById('mobileLoggedInButtons');
+                    const mobileStudentNameDisplay = document.getElementById('mobileStudentNameDisplay');
+
+                    if (currentStudent) {
+                        // Student is logged in - show logout button
+                        if (loggedOutButtons) loggedOutButtons.classList.add('hidden');
+                        if (loggedInButtons) {
+                            loggedInButtons.classList.remove('hidden');
+                            loggedInButtons.classList.add('flex');
+                        }
+                        if (studentNameDisplay) {
+                            const fullName = (currentStudent.firstName || '') + ' ' + (currentStudent.surname || '');
+                            studentNameDisplay.textContent = fullName.trim() || 'Student';
+                        }
+                        if (mobileLoggedOutButtons) mobileLoggedOutButtons.classList.add('hidden');
+                        if (mobileLoggedInButtons) mobileLoggedInButtons.classList.remove('hidden');
+                        if (mobileStudentNameDisplay) {
+                            const fullName = (currentStudent.firstName || '') + ' ' + (currentStudent.surname || '');
+                            mobileStudentNameDisplay.textContent = fullName.trim() || 'Student';
+                        }
+                    } else {
+                        // Student is not logged in - show register/login buttons
+                        if (loggedOutButtons) loggedOutButtons.classList.remove('hidden');
+                        if (loggedInButtons) {
+                            loggedInButtons.classList.add('hidden');
+                            loggedInButtons.classList.remove('flex');
+                        }
+                        if (mobileLoggedOutButtons) mobileLoggedOutButtons.classList.remove('hidden');
+                        if (mobileLoggedInButtons) mobileLoggedInButtons.classList.add('hidden');
+                    }
+                } catch (e) {
+                    console.error('Error updating auth navigation:', e);
+                }
+            }
+
+            // Run after a delay to ensure main.js is loaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(updateNav, 200);
+                });
+            } else {
+                setTimeout(updateNav, 200);
+            }
+        })();
+
+        // Handle student logout - make it globally accessible
+        window.handleStudentLogout = function() {
+            try {
+                // Clear session storage first
+                sessionStorage.removeItem('currentStudentId');
+                sessionStorage.removeItem('currentStudentName');
+                
+                // Try to call studentLogout if available
+                if (typeof studentLogout === 'function') {
+                    studentLogout();
+                }
+                
+                // Always redirect to homepage after logout
+                window.location.href = 'index.html';
+            } catch (e) {
+                console.error('Error during logout:', e);
+                // Fallback: ensure sessionStorage is cleared and redirect
+                sessionStorage.removeItem('currentStudentId');
+                sessionStorage.removeItem('currentStudentName');
+                window.location.href = 'index.html';
+            }
+        };
+
+        // Also attach event listeners to logout buttons as backup
+        (function attachLogoutListeners() {
+            function attachListeners() {
+                try {
+                    const logoutButtons = document.querySelectorAll('button[onclick*="handleStudentLogout"]');
+                    logoutButtons.forEach(button => {
+                        // Remove existing onclick and add event listener
+                        button.removeAttribute('onclick');
+                        button.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.handleStudentLogout();
+                        });
+                    });
+                } catch (e) {
+                    console.error('Error attaching logout listeners:', e);
+                }
+            }
+            
+            // Run after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', attachListeners);
+            } else {
+                attachListeners();
+            }
+            // Also run after a delay to catch dynamically added buttons
+            setTimeout(attachListeners, 500);
         })();
     } catch (e) {}
 })();

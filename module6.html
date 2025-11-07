@@ -14,6 +14,33 @@
 </head>
 <body class="bg-gray-50">
     <script src="js/layout.js"></script>
+    <script src="js/main.js"></script>
+    
+    <!-- Access Control Check -->
+    <div id="accessDeniedMessage" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 sm:p-8 text-center">
+            <div class="mb-4">
+                <svg class="mx-auto h-16 w-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-3">Access Restricted</h2>
+            <p class="text-gray-600 mb-6">You don't have access to this module. Please contact the administrator or <a href="register.html" class="text-[#244855] hover:underline">register for the course</a>.</p>
+            <a href="index.html" class="inline-block bg-[#244855] text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-[#1a3540] transition">
+                Go to Home
+            </a>
+        </div>
+    </div>
+
+    <script>
+        (function checkModuleAccess() {
+            const moduleId = '6';
+            if (!hasModuleAccess(moduleId)) {
+                document.getElementById('accessDeniedMessage').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        })();
+    </script>
 
     <div class="flex">
         <aside id="sidebar" class="hidden lg:block w-80 bg-white shadow-lg h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto">

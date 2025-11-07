@@ -12,9 +12,10 @@ This guide will help you deploy your Courseinfinity project to Hostinger hosting
 
 ### ✅ Files/Folders to INCLUDE:
 - `index.html` (main entry point)
+- `index.php` (PHP fallback - recommended)
 - `admin.html`
-- `login.html`
 - `register.html`
+- `login.html` (student login)
 - `module1.html` through `module7.html`
 - `accessibility.html`
 - `aml-policy.html`
@@ -26,6 +27,7 @@ This guide will help you deploy your Courseinfinity project to Hostinger hosting
 - `terms.html`
 - `assets/` folder (with all images/logos)
 - `js/` folder (with all JavaScript files)
+- `json/` folder (with all unit files and site.json)
 - `.htaccess` file (for security and routing)
 
 ### ❌ Files/Folders to EXCLUDE:
@@ -103,12 +105,14 @@ Your `public_html` folder should look like this:
 ```
 public_html/
 ├── index.html
-├── admin.html
-├── login.html
+├── index.php
 ├── register.html
+├── login.html
+├── admin.html
 ├── module1.html
 ├── module2.html
 ├── ... (other HTML files)
+├── .htaccess
 ├── assets/
 │   ├── logo.svg
 │   └── monty.jpg
@@ -116,15 +120,25 @@ public_html/
 │   ├── footer.js
 │   ├── layout.js
 │   ├── main.js
-│   └── modules.js
-└── .htaccess
+│   ├── modules.js
+│   └── seo.js
+└── json/
+    ├── site.json
+    └── units/
+        └── ... (all unit folders)
 ```
 
 ### 2. Test Your Site
 1. Visit your domain: `https://yourdomain.com`
 2. Test registration: `https://yourdomain.com/register.html`
-3. Test login: `https://yourdomain.com/login.html`
+3. Test student login: `https://yourdomain.com/login.html`
+   - After login, verify logout button appears in navigation
+   - Test logout functionality
 4. Test admin panel: `https://yourdomain.com/admin.html`
+   - **Admin Credentials:** Email: `admin@lm.com`, Password: `admin123`
+   - Test admin logout functionality
+5. Test module access: `https://yourdomain.com/module1.html`
+6. Verify navigation shows correct login/logout buttons based on user status
 
 ### 3. Configure SSL (If Not Already Active)
 - In Hostinger control panel, go to "SSL"
@@ -141,6 +155,15 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 - Point DNS to Hostinger's nameservers (if needed)
 
 ## ⚠️ Important Notes
+
+### Admin Credentials
+- **Default Admin Login:** Email: `admin@lm.com`, Password: `admin123`
+- ⚠️ **Change these credentials in production!** Edit `js/main.js` and update the `initializeAdmin()` function
+
+### Logout Functionality
+- **Student Logout:** Available in navigation bar when student is logged in
+- **Admin Logout:** Available in admin panel header (red logout button)
+- Both logout functions clear session storage and redirect to homepage
 
 ### localStorage Limitation
 - This application uses browser localStorage for data storage

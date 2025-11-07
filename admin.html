@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Admin Panel - L&M Mastermind</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="description" content="Admin panel for managing student registrations and course access.">
+    <script src="js/seo.js"></script>
+    <style>
+        * { font-family: 'Poppins', sans-serif; }
+        html { scroll-behavior: smooth; }
+        
+        /* Mobile responsive fixes */
+        @media (max-width: 640px) {
+            /* Prevent horizontal scroll */
+            body {
+                overflow-x: hidden;
+                width: 100%;
+            }
+            
+            /* Touch-friendly buttons */
+            button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            /* Form inputs mobile */
+            input, textarea, select {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            /* Student cards mobile */
+            #pendingRegistrations > div,
+            #approvedStudents > div {
+                padding: 1rem;
+            }
+            
+            /* Modal mobile */
+            #studentModal > div {
+                margin: 0.5rem;
+                max-height: calc(100vh - 1rem);
+            }
+        }
+        
+        /* Tablet responsive fixes */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            /* Prevent text overflow */
+            h1, h2, h3, h4, h5, h6 {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+        }
+        
+        /* General responsive improvements */
+        @media (max-width: 1024px) {
+            /* Break long words */
+            .break-words {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+            
+            /* Student registration cards */
+            #pendingRegistrations > div,
+            #approvedStudents > div {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            #pendingRegistrations button,
+            #approvedStudents button {
+                width: 100%;
+                margin-top: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <script src="js/layout.js"></script>
+    <script src="js/main.js"></script>
+
+    <!-- Admin Login Form (shown when not logged in) -->
+    <div id="adminLoginForm" class="hidden">
+        <section class="py-12 sm:py-16 lg:py-20">
+            <div class="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white rounded-xl shadow-lg p-6 sm:p-8 lg:p-10">
+                    <div class="text-center mb-6 sm:mb-8">
+                        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#244855] mb-2">Admin Login</h1>
+                        <p class="text-gray-600">Enter your credentials to access the admin panel</p>
+                    </div>
+
+                    <form id="loginForm" class="space-y-4 sm:space-y-5">
+                        <div>
+                            <label for="adminEmail" class="block text-sm font-medium text-gray-700 mb-2">Email <span class="text-red-500">*</span></label>
+                            <input type="email" id="adminEmail" name="adminEmail" required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#244855] focus:border-transparent outline-none transition"
+                                placeholder="Enter your email">
+                        </div>
+
+                        <div>
+                            <label for="adminPassword" class="block text-sm font-medium text-gray-700 mb-2">Password <span class="text-red-500">*</span></label>
+                            <input type="password" id="adminPassword" name="adminPassword" required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#244855] focus:border-transparent outline-none transition"
+                                placeholder="Enter your password">
+                        </div>
+
+                        <div id="loginErrorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"></div>
+
+                        <button type="submit" 
+                            class="w-full bg-[#244855] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#1a3540] transition duration-200 transform hover:scale-[1.02] active:scale-[0.98]">
+                            Login
+                        </button>
+                    </form>
+
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-600">
+                            <a href="index.html" class="text-[#244855] hover:underline font-medium">Back to Home</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Admin Panel Section (shown when logged in) -->
+    <div id="adminPanelContent" class="hidden">
+        <section class="py-8 sm:py-12">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white rounded-xl shadow-lg p-6 sm:p-8">
+                    <div class="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#244855] mb-2">Admin Panel</h1>
+                            <p class="text-gray-600">Manage student registrations and module access</p>
+                            <p class="text-sm text-gray-500 mt-2 break-words">Logged in as: <span id="adminEmailDisplay" class="font-medium"></span></p>
+                        </div>
+                        <button onclick="handleAdminLogout()" 
+                            class="bg-red-600 text-white px-4 sm:px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 transition text-sm sm:text-base whitespace-nowrap min-h-[44px] flex items-center justify-center">
+                            Logout
+                        </button>
+                    </div>
+
+                <!-- Pending Registrations -->
+                <div class="mb-8">
+                    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-4">Pending Registrations</h2>
+                    <div id="pendingRegistrations" class="space-y-4">
+                        <p class="text-gray-500 text-center py-8">No pending registrations.</p>
+                    </div>
+                </div>
+
+                <!-- Approved Students -->
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-4">Approved Students</h2>
+                    <div id="approvedStudents" class="space-y-4">
+                        <p class="text-gray-500 text-center py-8">No approved students yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    </div>
+
+    <!-- Student Details Modal -->
+    <div id="studentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto m-2 sm:m-4">
+            <div class="p-4 sm:p-6 lg:p-8">
+                <div class="flex justify-between items-start gap-4 mb-4 sm:mb-6">
+                    <h3 class="text-xl sm:text-2xl font-bold text-[#244855] flex-1">Student Details</h3>
+                    <button onclick="closeStudentModal()" class="text-gray-400 hover:text-gray-600 text-2xl sm:text-3xl leading-none min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close">×</button>
+                </div>
+                
+                <div id="studentDetails" class="space-y-4">
+                    <!-- Student details will be populated here -->
+                </div>
+
+                <div class="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+                    <h4 class="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Module Access Control</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="1" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 1</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="2" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 2</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="3" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 3</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="4" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 4</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="5" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 5</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="6" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 6</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" value="7" class="module-access-checkbox w-4 h-4 text-[#244855] border-gray-300 rounded focus:ring-[#244855]">
+                            <span class="text-sm text-gray-700">Module 7</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <button onclick="approveStudent()" class="flex-1 bg-green-600 text-white py-2.5 sm:py-2.5 px-4 sm:px-6 rounded-lg font-semibold hover:bg-green-700 transition min-h-[44px] flex items-center justify-center">
+                            Approve Student
+                        </button>
+                        <button onclick="rejectStudent()" class="flex-1 bg-red-600 text-white py-2.5 sm:py-2.5 px-4 sm:px-6 rounded-lg font-semibold hover:bg-red-700 transition min-h-[44px] flex items-center justify-center">
+                            Reject Student
+                        </button>
+                        <button onclick="updateAccess()" id="updateAccessBtn" class="flex-1 bg-[#244855] text-white py-2.5 sm:py-2.5 px-4 sm:px-6 rounded-lg font-semibold hover:bg-[#1a3540] transition hidden min-h-[44px] flex items-center justify-center">
+                            Update Access
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/footer.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        // Admin authentication and page control
+        function checkAdminAuth() {
+            if (isAdminLoggedIn()) {
+                // Show admin panel, hide login form
+                document.getElementById('adminLoginForm').classList.add('hidden');
+                document.getElementById('adminPanelContent').classList.remove('hidden');
+                document.getElementById('adminEmailDisplay').textContent = getCurrentAdminEmail();
+                // Load registrations
+                loadRegistrations();
+            } else {
+                // Show login form, hide admin panel
+                document.getElementById('adminLoginForm').classList.remove('hidden');
+                document.getElementById('adminPanelContent').classList.add('hidden');
+            }
+        }
+
+        // Handle admin logout - make it globally accessible
+        window.handleAdminLogout = function() {
+            try {
+                // Clear session storage first
+                sessionStorage.removeItem('adminLoggedIn');
+                sessionStorage.removeItem('adminEmail');
+                
+                // Try to call adminLogout if available
+                if (typeof adminLogout === 'function') {
+                    adminLogout();
+                }
+                
+                // Always redirect to homepage after logout
+                window.location.href = 'index.html';
+            } catch (e) {
+                console.error('Error during admin logout:', e);
+                // Fallback: ensure sessionStorage is cleared and redirect
+                sessionStorage.removeItem('adminLoggedIn');
+                sessionStorage.removeItem('adminEmail');
+                window.location.href = 'index.html';
+            }
+        };
+
+        // Also attach event listeners to logout buttons as backup
+        (function attachAdminLogoutListeners() {
+            function attachListeners() {
+                try {
+                    const logoutButtons = document.querySelectorAll('button[onclick*="handleAdminLogout"]');
+                    logoutButtons.forEach(button => {
+                        // Remove existing onclick and add event listener
+                        button.removeAttribute('onclick');
+                        button.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.handleAdminLogout();
+                        });
+                    });
+                } catch (e) {
+                    console.error('Error attaching admin logout listeners:', e);
+                }
+            }
+            
+            // Run after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', attachListeners);
+            } else {
+                attachListeners();
+            }
+            // Also run after a delay to catch dynamically added buttons
+            setTimeout(attachListeners, 500);
+        })();
+
+        // Login form handler
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const errorDiv = document.getElementById('loginErrorMessage');
+            errorDiv.classList.add('hidden');
+
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value;
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Please enter both email and password.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (adminLogin(email, password)) {
+                // Success - reload page state
+                checkAdminAuth();
+            } else {
+                errorDiv.textContent = 'Invalid email or password. Please try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAdminAuth();
+        });
+
+        let currentStudentId = null;
+        let isApprovedStudent = false;
+
+        // Load and display registrations
+        function loadRegistrations() {
+            const pending = getPendingRegistrations();
+            const approved = getApprovedStudents();
+            
+            displayPendingRegistrations(pending);
+            displayApprovedStudents(approved);
+        }
+
+        function displayPendingRegistrations(registrations) {
+            const container = document.getElementById('pendingRegistrations');
+            
+            if (registrations.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No pending registrations.</p>';
+                return;
+            }
+
+            container.innerHTML = registrations.map(student => `
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-5 hover:shadow-md transition">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-base sm:text-lg font-semibold text-gray-800 break-words">${escapeHtml(student.firstName)} ${escapeHtml(student.surname)}</h3>
+                            <p class="text-sm text-gray-600 mt-1 break-all">Phone: ${escapeHtml(student.phone)}</p>
+                            <p class="text-xs text-gray-500 mt-1">Registered: ${new Date(student.registeredAt).toLocaleDateString()}</p>
+                        </div>
+                        <button onclick="viewStudent('${student.id}', false)" 
+                            class="bg-[#244855] text-white px-4 py-2.5 rounded-lg font-medium hover:bg-[#1a3540] transition whitespace-nowrap min-h-[44px] w-full sm:w-auto flex items-center justify-center">
+                            Review
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayApprovedStudents(students) {
+            const container = document.getElementById('approvedStudents');
+            
+            if (students.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No approved students yet.</p>';
+                return;
+            }
+
+            container.innerHTML = students.map(student => {
+                const modules = student.accessModules || [];
+                const moduleList = modules.length > 0 
+                    ? modules.map(m => `Module ${m}`).join(', ')
+                    : 'No modules assigned';
+                
+                return `
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-5 hover:shadow-md transition">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-base sm:text-lg font-semibold text-gray-800 break-words">${escapeHtml(student.firstName)} ${escapeHtml(student.surname)}</h3>
+                                <p class="text-sm text-gray-600 mt-1 break-all">Phone: ${escapeHtml(student.phone)}</p>
+                                <p class="text-sm text-[#244855] mt-1 font-medium break-words">Access: ${moduleList}</p>
+                                <p class="text-xs text-gray-500 mt-1">Approved: ${new Date(student.approvedAt).toLocaleDateString()}</p>
+                            </div>
+                            <button onclick="viewStudent('${student.id}', true)" 
+                                class="bg-[#244855] text-white px-4 py-2.5 rounded-lg font-medium hover:bg-[#1a3540] transition whitespace-nowrap min-h-[44px] w-full sm:w-auto flex items-center justify-center">
+                                Manage Access
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewStudent(studentId, approved) {
+            currentStudentId = studentId;
+            isApprovedStudent = approved;
+            
+            const student = approved 
+                ? getStudentById(studentId)
+                : getPendingStudentById(studentId);
+            
+            if (!student) return;
+
+            const detailsDiv = document.getElementById('studentDetails');
+            detailsDiv.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">First Name</label>
+                        <p class="text-gray-900 mt-1">${escapeHtml(student.firstName)}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Surname</label>
+                        <p class="text-gray-900 mt-1">${escapeHtml(student.surname)}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Phone Number</label>
+                        <p class="text-gray-900 mt-1">${escapeHtml(student.phone)}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Registration Date</label>
+                        <p class="text-gray-900 mt-1">${new Date(student.registeredAt).toLocaleString()}</p>
+                    </div>
+                    ${student.message ? `
+                    <div class="sm:col-span-2">
+                        <label class="text-sm font-medium text-gray-700">Message</label>
+                        <p class="text-gray-900 mt-1">${escapeHtml(student.message)}</p>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Set module checkboxes
+            const checkboxes = document.querySelectorAll('.module-access-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+            
+            if (approved && student.accessModules) {
+                student.accessModules.forEach(moduleId => {
+                    const checkbox = document.querySelector(`.module-access-checkbox[value="${moduleId}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            }
+
+            // Show/hide buttons
+            const approveBtn = document.querySelector('button[onclick="approveStudent()"]');
+            const rejectBtn = document.querySelector('button[onclick="rejectStudent()"]');
+            const updateBtn = document.getElementById('updateAccessBtn');
+            
+            if (approved) {
+                approveBtn.style.display = 'none';
+                rejectBtn.style.display = 'none';
+                updateBtn.classList.remove('hidden');
+            } else {
+                approveBtn.style.display = 'block';
+                rejectBtn.style.display = 'block';
+                updateBtn.classList.add('hidden');
+            }
+
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+            currentStudentId = null;
+        }
+
+        function approveStudent() {
+            if (!currentStudentId) return;
+            
+            const selectedModules = Array.from(document.querySelectorAll('.module-access-checkbox:checked'))
+                .map(cb => parseInt(cb.value));
+            
+            if (selectedModules.length === 0) {
+                alert('Please select at least one module for the student.');
+                return;
+            }
+
+            if (approveStudentRegistration(currentStudentId, selectedModules)) {
+                closeStudentModal();
+                loadRegistrations();
+                alert('Student approved successfully!');
+            } else {
+                alert('Error approving student. Please try again.');
+            }
+        }
+
+        function rejectStudent() {
+            if (!currentStudentId) return;
+            
+            if (confirm('Are you sure you want to reject this student registration?')) {
+                if (rejectStudentRegistration(currentStudentId)) {
+                    closeStudentModal();
+                    loadRegistrations();
+                    alert('Student registration rejected.');
+                } else {
+                    alert('Error rejecting student. Please try again.');
+                }
+            }
+        }
+
+        function updateAccess() {
+            if (!currentStudentId || !isApprovedStudent) return;
+            
+            const selectedModules = Array.from(document.querySelectorAll('.module-access-checkbox:checked'))
+                .map(cb => parseInt(cb.value));
+            
+            if (selectedModules.length === 0) {
+                alert('Please select at least one module for the student.');
+                return;
+            }
+
+            if (updateStudentAccess(currentStudentId, selectedModules)) {
+                closeStudentModal();
+                loadRegistrations();
+                alert('Student access updated successfully!');
+            } else {
+                alert('Error updating access. Please try again.');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on outside click
+        document.getElementById('studentModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeStudentModal();
+            }
+        });
+    </script>
+</body>
+</html>
+
